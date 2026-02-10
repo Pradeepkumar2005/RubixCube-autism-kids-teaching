@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Stars } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import Palette from "./components/Palette";
 import Cube from "./components/Cube";
 import Interface from "./components/Interface";
 import "./App.css";
+
+import MathGame from "./components/MathGame";
+import VideoReward from "./components/VideoReward";
 
 export default function App() {
   // 54 stickers. Initial state: all white (blank canvas)
   const [cubeState, setCubeState] = useState(Array(54).fill("#FFFFFF"));
   const [selectedColor, setSelectedColor] = useState("#C41E3A"); // Default Red
   const [message, setMessage] = useState("Pick a color and paint the cube!");
+  const [view, setView] = useState("home"); // 'home' or 'game'
+  const [showReward, setShowReward] = useState(false);
 
   const checkCompletion = (currentColors) => {
     const faces = [
@@ -23,28 +28,57 @@ export default function App() {
     ];
 
     let completedFace = null;
+    let allSolved = true;
 
     for (const face of faces) {
       const faceColors = currentColors.slice(face.start, face.start + 9);
       const firstColor = faceColors[0];
-      // Check if all same and not white (assuming white is empty/default)
-      if (firstColor !== "#FFFFFF" && faceColors.every((c) => c === firstColor)) {
-        completedFace = face.name;
-        break;
+
+      const isFaceSolved = firstColor !== "#FFFFFF" && faceColors.every((c) => c === firstColor);
+
+      if (isFaceSolved) {
+        // If we haven't found a single completed face yet, mark this one
+        if (!completedFace) completedFace = face.name;
+      } else {
+        // If any face is NOT solved, then the whole cube is not solved
+        allSolved = false;
       }
     }
 
-    if (completedFace) {
-      setMessage(`Yay! You completed the ${completedFace} face! 🎉`);
+    if (allSolved) {
+      setMessage("INCREDIBLE! You solved the WHOLE CUBE! 🌟🎉🏆");
+      setShowReward(true);
+    } else if (completedFace) {
+      setMessage(`Yay! You completed the ${completedFace} face! Keep going!`);
     } else {
-      setMessage(""); // Clear message if no win this turn, or keep it? 
-      // Better to clear it so they don't see "Yay" if they break it.
-      // But if they break it, we should probably check if *another* face is still full. 
-      // Logic above finds the *first* completed face. 
+      setMessage(""); // Clear message if no win this turn
     }
   };
 
+  const getColorCounts = () => {
+    const counts = {};
+    cubeState.forEach(color => {
+      counts[color] = (counts[color] || 0) + 1;
+    });
+    return counts;
+  };
+
+  const colorCounts = getColorCounts();
+
   const handleFaceClick = (index) => {
+    // Limit check: specific color should not exceed 9 (except White which is default/eraser)
+    if (selectedColor !== "#FFFFFF") {
+      const currentCount = colorCounts[selectedColor] || 0;
+      if (currentCount >= 9) {
+        setMessage(`You've already used 9 ${selectedColor === "#C41E3A" ? "Red" :
+          selectedColor === "#009E60" ? "Green" :
+            selectedColor === "#0051BA" ? "Blue" :
+              selectedColor === "#FFD500" ? "Yellow" :
+                selectedColor === "#FF5800" ? "Orange" : "squares"}!`);
+        return;
+      }
+    }
+
     const newColors = [...cubeState];
     newColors[index] = selectedColor;
     setCubeState(newColors);
@@ -56,33 +90,44 @@ export default function App() {
   const handleReset = () => {
     setCubeState(Array(54).fill("#FFFFFF"));
     setMessage("Cube Reset! Start Painting.");
+    setShowReward(false);
   };
 
   return (
-    <div className="App" style={{ height: "100vh", background: "#1a1a1a", display: 'flex', flexDirection: 'column' }}>
+    <div className="App" style={{ height: "100vh", display: 'flex', flexDirection: 'column' }}>
 
-      {/* 3D Canvas Area */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        <Canvas camera={{ position: [4, 4, 4] }}>
-          <ambientLight intensity={0.5} />
-          <pointLight position={[10, 10, 10]} />
-          <Stars />
+      {view === "home" ? (
+        <>
+          {showReward && <VideoReward onClose={() => setShowReward(false)} />}
 
-          <Cube cubeState={cubeState} onFaceClick={handleFaceClick} />
+          {/* 3D Canvas Area */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <Canvas dpr={[1, 2]} camera={{ position: [4, 4, 4] }}>
+              <ambientLight intensity={0.7} />
+              <pointLight position={[10, 10, 10]} intensity={1} />
+              <Cube cubeState={cubeState} onFaceClick={handleFaceClick} />
+              <OrbitControls minDistance={3} maxDistance={10} enablePan={false} />
+            </Canvas>
 
-          <OrbitControls minDistance={3} maxDistance={10} />
-        </Canvas>
+            <Interface
+              onReset={handleReset}
+              message={message}
+              onCheck={() => setView("game")}
+            />
+          </div>
 
-        <Interface
-          onReset={handleReset}
-          message={message}
-        />
-      </div>
-
-      {/* Palette Area */}
-      <div style={{ background: '#333', paddingBottom: '20px' }}>
-        <Palette selectedColor={selectedColor} onSelectColor={setSelectedColor} />
-      </div>
+          {/* Palette Area */}
+          <div style={{ background: '#333', paddingBottom: '20px' }}>
+            <Palette
+              selectedColor={selectedColor}
+              onSelectColor={setSelectedColor}
+              colorCounts={colorCounts}
+            />
+          </div>
+        </>
+      ) : (
+        <MathGame onBack={() => setView("home")} />
+      )}
 
     </div>
   );
