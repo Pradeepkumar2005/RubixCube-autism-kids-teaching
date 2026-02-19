@@ -1,142 +1,88 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
-
-const COLORS = ["#C41E3A", "#009E60", "#0051BA", "#FFD500", "#FF5800", "#FFFFFF"];
-const COLOR_NAMES = {
-    "#C41E3A": "Red",
-    "#009E60": "Green",
-    "#0051BA": "Blue",
-    "#FFD500": "Yellow",
-    "#FF5800": "Orange",
-    "#FFFFFF": "White",
-};
+import CountingLevel from "./MathLevels/CountingLevel";
+import GeometryLevel from "./MathLevels/GeometryLevel";
+import PatternLevel from "./MathLevels/PatternLevel";
+import MultiplicationLevel from "./MathLevels/MultiplicationLevel";
+import FractionLevel from "./MathLevels/FractionLevel";
 
 export default function MathGame({ onBack }) {
-    const [grid, setGrid] = useState([]);
-    const [question, setQuestion] = useState({});
-    const [options, setOptions] = useState([]);
+    const [currentLevel, setCurrentLevel] = useState("menu");
     const [score, setScore] = useState(0);
-    const [message, setMessage] = useState("Let's Play!");
     const [topScore, setTopScore] = useState(
         parseInt(localStorage.getItem("mathGameTopScore")) || 0
     );
 
-    const generateOptions = useCallback((correctAnswer) => {
-        let opts = new Set([correctAnswer]);
-        while (opts.size < 3) {
-            let wrong = Math.max(0, correctAnswer + Math.floor(Math.random() * 5) - 2);
-            if (wrong !== correctAnswer) opts.add(wrong);
-        }
-        setOptions(Array.from(opts).sort(() => Math.random() - 0.5));
-    }, []); // setOptions is a stable setter, no need to include
+    const handleProblemComplete = () => {
+        // Increment score for completing a full CRA set
+        const newScore = score + 1;
+        setScore(newScore);
 
-    const generateLevel = useCallback(() => {
-        // 1. Generate 3x3 Grid
-        const newGrid = Array(9)
-            .fill(null)
-            .map(() => COLORS[Math.floor(Math.random() * COLORS.length)]);
-        setGrid(newGrid);
-
-        // 2. Formulate Question
-        const types = ["count", "add", "sub", "mul", "div"];
-        const type = types[Math.floor(Math.random() * types.length)];
-        let answer = 0;
-        let text = "";
-
-        if (type === "count") {
-            const targetColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-            answer = newGrid.filter((c) => c === targetColor).length;
-            text = `Count the ${COLOR_NAMES[targetColor]} blocks!`;
-        } else if (type === "add") {
-            const color1 = COLORS[Math.floor(Math.random() * COLORS.length)];
-            let color2 = COLORS[Math.floor(Math.random() * COLORS.length)];
-            while (color1 === color2) color2 = COLORS[Math.floor(Math.random() * COLORS.length)];
-
-            const count1 = newGrid.filter((c) => c === color1).length;
-            const count2 = newGrid.filter((c) => c === color2).length;
-            answer = count1 + count2;
-            text = `${COLOR_NAMES[color1]} (${count1}) + ${COLOR_NAMES[color2]} (${count2}) = ?`;
-        } else if (type === "sub") {
-            const val1 = Math.floor(Math.random() * 10) + 5; // 5-14
-            const val2 = Math.floor(Math.random() * 5) + 1;  // 1-5
-            answer = val1 - val2;
-            text = `${val1} - ${val2} = ?`;
-        } else if (type === "mul") {
-            const val1 = Math.floor(Math.random() * 5) + 1; // 1-5
-            const val2 = Math.floor(Math.random() * 4) + 1; // 1-4
-            answer = val1 * val2;
-            text = `${val1} × ${val2} = ?`;
-        } else if (type === "div") {
-            const val2 = Math.floor(Math.random() * 4) + 1; // 1-4 (divisor)
-            answer = Math.floor(Math.random() * 5) + 1;     // 1-5 (quotient)
-            const val1 = answer * val2;                     // dividend
-            text = `${val1} ÷ ${val2} = ?`;
+        if (newScore > topScore) {
+            setTopScore(newScore);
+            localStorage.setItem("mathGameTopScore", newScore);
         }
 
-        setQuestion({ text, answer });
-        generateOptions(answer);
-        setMessage("Let's Play!");
-    }, [generateOptions]);
-
-    useEffect(() => {
-        generateLevel();
-    }, [generateLevel]);
-
-    const handleOptionClick = (val) => {
-        if (val === question.answer) {
-            setMessage("Correct! 🎉");
-            const newScore = score + 1;
-            setScore(newScore);
-
-            if (newScore > topScore) {
-                setTopScore(newScore);
-                localStorage.setItem("mathGameTopScore", newScore);
-            }
-
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 },
-            });
-            setTimeout(generateLevel, 1500);
-        } else {
-            setMessage("Oops! Score reset to 0 😢");
-            setScore(0);
-        }
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#FFD500', '#009E60', '#0051BA']
+        });
     };
 
+    const commonProps = {
+        onBack: () => setCurrentLevel("menu"),
+        onComplete: handleProblemComplete, // Renamed for clarity in child, but keeping prop name flexible
+        score: score,
+        topScore: topScore
+    };
+
+    if (currentLevel === "counting") return <CountingLevel {...commonProps} />;
+    if (currentLevel === "geometry") return <GeometryLevel {...commonProps} />;
+    if (currentLevel === "patterns") return <PatternLevel {...commonProps} />;
+    if (currentLevel === "multiplication") return <MultiplicationLevel {...commonProps} />;
+    if (currentLevel === "fractions") return <FractionLevel {...commonProps} />;
+
     return (
-        <div className="math-game-container">
-            <button className="back-button" onClick={onBack}>
+        <div className="math-menu-container sensory-friendly">
+            <h1 className="menu-title">Choose Your Adventure! 🚀</h1>
+
+            <div className="score-board-menu" style={{ marginBottom: '30px', fontSize: '1.5rem', fontWeight: 'bold', color: '#6C5CE7' }}>
+                <span>Star Power: {score} ⭐</span>
+                <span style={{ marginLeft: '20px', opacity: 0.8 }}>Best: {topScore} 🏆</span>
+            </div>
+
+            <div className="levels-grid">
+                <button className="level-card" onClick={() => setCurrentLevel("counting")} style={{ borderColor: '#0051BA' }}>
+                    <span className="level-icon">123</span>
+                    <span className="level-name">Counting</span>
+                </button>
+
+                <button className="level-card" onClick={() => setCurrentLevel("geometry")} style={{ borderColor: '#009E60' }}>
+                    <span className="level-icon">⬡</span>
+                    <span className="level-name">Shapes</span>
+                </button>
+
+                <button className="level-card" onClick={() => setCurrentLevel("patterns")} style={{ borderColor: '#FF5800' }}>
+                    <span className="level-icon">●■●</span>
+                    <span className="level-name">Patterns</span>
+                </button>
+
+                <button className="level-card" onClick={() => setCurrentLevel("multiplication")} style={{ borderColor: '#C41E3A' }}>
+                    <span className="level-icon">×</span>
+                    <span className="level-name">Grouping</span>
+                </button>
+
+                <button className="level-card" onClick={() => setCurrentLevel("fractions")} style={{ borderColor: '#FFD500' }}>
+                    <span className="level-icon">½</span>
+                    <span className="level-name">Fractions</span>
+                </button>
+            </div>
+
+            <button className="back-button-large" onClick={onBack}>
                 ⬅ Back to Cube
             </button>
-
-            <div className="score-board">
-                <div>Score: {score}</div>
-                <div style={{ fontSize: '0.8em', opacity: 0.8 }}>Top: {topScore}</div>
-            </div>
-
-            <h2 className="question-text">{question.text}</h2>
-
-            <div className="grid-container">
-                {grid.map((color, i) => (
-                    <div
-                        key={i}
-                        className="grid-item"
-                        style={{ backgroundColor: color }}
-                    />
-                ))}
-            </div>
-
-            <div className="options-container">
-                {options.map((opt, i) => (
-                    <button key={i} className="option-button" onClick={() => handleOptionClick(opt)}>
-                        {opt}
-                    </button>
-                ))}
-            </div>
-
-            <div className="feedback-message">{message}</div>
         </div>
     );
 }
